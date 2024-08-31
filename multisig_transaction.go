@@ -1,4 +1,5 @@
 // multisig_transaction.go
+
 package main
 
 import (
@@ -12,23 +13,25 @@ import (
 	"time"
 )
 
+// Represents a transaction that requires multiple signatures to be valid.
 type MultisigTransaction struct {
 	Sender       string
 	Recipient    string
 	Amount       int
 	Fee          int
 	Signatures   []Signature
-	RequiredSigs int
-	Timestamp    int64
-	ExpiresAt    int64
+	RequiredSigs int      // The number of signatures required to approve the transaction.
+	Timestamp    int64    // The time when the transaction was created.
+	ExpiresAt    int64    // The expiration time after which the transaction is no longer valid.
 }
 
+// Represents a digital signature associated with a transaction.
 type Signature struct {
 	R, S   *big.Int
 	PubKey *ecdsa.PublicKey
 }
 
-// NewMultisigTransaction creates a new multisig transaction with a specified expiration time.
+// Creates a new multisig transaction with a specified expiration time.
 func NewMultisigTransaction(sender, recipient string, amount, fee, requiredSigs int, expirationDuration time.Duration) *MultisigTransaction {
 	return &MultisigTransaction{
 		Sender:       sender,
@@ -41,14 +44,14 @@ func NewMultisigTransaction(sender, recipient string, amount, fee, requiredSigs 
 	}
 }
 
-// Hash computes the hash of the transaction.
+// Computes a unique hash of the transaction using its key fields.
 func (tx *MultisigTransaction) Hash() string {
 	txData := tx.Sender + tx.Recipient + strconv.Itoa(tx.Amount) + strconv.Itoa(tx.Fee) + strconv.Itoa(tx.RequiredSigs) + strconv.FormatInt(tx.Timestamp, 10)
 	hash := sha256.Sum256([]byte(txData))
 	return hex.EncodeToString(hash[:])
 }
 
-// AddSignature adds a signature to the transaction.
+// Adds a signature to the transaction, provided it has not expired.
 func (tx *MultisigTransaction) AddSignature(privKey *ecdsa.PrivateKey) error {
 	if time.Now().Unix() > tx.ExpiresAt {
 		return errors.New("transaction has expired")
@@ -63,7 +66,7 @@ func (tx *MultisigTransaction) AddSignature(privKey *ecdsa.PrivateKey) error {
 	return nil
 }
 
-// Verify checks if the transaction has the required number of valid signatures.
+// Checks if the transaction has the required number of valid signatures.
 func (tx *MultisigTransaction) Verify() bool {
 	if time.Now().Unix() > tx.ExpiresAt {
 		return false
@@ -82,7 +85,7 @@ func (tx *MultisigTransaction) Verify() bool {
 	return false
 }
 
-// ValidateUTXO validates the UTXOs used by the transaction and updates the UTXO set.
+// Validates the UTXOs used by the transaction and updates the UTXO set.
 func (tx *MultisigTransaction) ValidateUTXO(utxoSet *UTXOSet) error {
 	utxos, total := utxoSet.FindUTXOs(tx.Sender, tx.Amount+tx.Fee)
 	if total < tx.Amount+tx.Fee {
@@ -92,7 +95,7 @@ func (tx *MultisigTransaction) ValidateUTXO(utxoSet *UTXOSet) error {
 	// Spend the UTXOs
 	utxoSet.SpendUTXOs(utxos)
 
-	// Create new UTXO for the recipient
+	// Create a new UTXO for the recipient
 	newUTXO := UTXO{
 		TxID:   tx.Hash(),
 		Index:  0,

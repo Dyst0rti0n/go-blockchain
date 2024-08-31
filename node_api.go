@@ -8,23 +8,27 @@ import (
 	"strings"
 )
 
+// Provides an HTTP API for interacting with the blockchain node.
 type NodeAPI struct {
 	Node *Node
 }
 
+// Client that interacts with the NodeAPI via HTTP requests.
 type NodeAPIClient struct {
 	BaseURL string
 }
 
+// Initialises a new NodeAPI with a given node.
 func NewNodeAPI(node *Node) *NodeAPI {
 	return &NodeAPI{Node: node}
 }
 
+// Creates a new client for communicating with the NodeAPI.
 func NewNodeAPIClient(baseURL string) *NodeAPIClient {
 	return &NodeAPIClient{BaseURL: baseURL}
 }
 
-// Start the API server
+// Start starts the HTTP API server on the specified port.
 func (api *NodeAPI) Start(port string) error {
 	http.HandleFunc("/balance", api.handleGetBalance)
 	http.HandleFunc("/send", api.handleSendTransaction)
@@ -34,7 +38,7 @@ func (api *NodeAPI) Start(port string) error {
 	return http.ListenAndServe(port, nil)
 }
 
-// Get balance of an address
+// Handles requests to get the balance of a specific address.
 func (api *NodeAPI) handleGetBalance(w http.ResponseWriter, r *http.Request) {
 	address := r.URL.Query().Get("address")
 	if address == "" {
@@ -45,7 +49,7 @@ func (api *NodeAPI) handleGetBalance(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]int{"balance": balance})
 }
 
-// Send a new transaction
+// Handles requests to send a new transaction.
 func (api *NodeAPI) handleSendTransaction(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Sender    string `json:"sender"`
@@ -65,13 +69,14 @@ func (api *NodeAPI) handleSendTransaction(w http.ResponseWriter, r *http.Request
 		Fee:       req.Fee,
 	}
 
-	// Ensure the private key is passed to this API or use a generic signing method
+	// Sign the transaction with the node's private key
 	err := tx.Sign(api.Node.PrivateKey)
 	if err != nil {
 		http.Error(w, "Failed to sign transaction", http.StatusInternalServerError)
 		return
 	}
 
+	// Add the transaction to the mempool
 	err = api.Node.Blockchain.Mempool.AddTransaction(tx, api.Node.Blockchain.Accounts, api.Node.Blockchain.UTXOSet)
 	if err != nil {
 		http.Error(w, "Failed to add transaction to the mempool", http.StatusInternalServerError)
@@ -81,12 +86,12 @@ func (api *NodeAPI) handleSendTransaction(w http.ResponseWriter, r *http.Request
 	json.NewEncoder(w).Encode(map[string]string{"status": "Transaction added to mempool"})
 }
 
-// Get the entire blockchain
+// Handles requests to get the entire blockchain.
 func (api *NodeAPI) handleGetBlockchain(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(api.Node.Blockchain.Blocks)
 }
 
-// Get a specific transaction by ID
+// Handles requests to get a specific transaction by its ID.
 func (api *NodeAPI) handleGetTransaction(w http.ResponseWriter, r *http.Request) {
 	txID := r.URL.Query().Get("id")
 	if txID == "" {
@@ -103,6 +108,7 @@ func (api *NodeAPI) handleGetTransaction(w http.ResponseWriter, r *http.Request)
 	json.NewEncoder(w).Encode(tx)
 }
 
+// Sends a request to the NodeAPI to get the balance of a specific address.
 func (api *NodeAPIClient) GetBalance(address string) (int, error) {
 	resp, err := http.Get(fmt.Sprintf("%s/balance?address=%s", api.BaseURL, address))
 	if err != nil {
@@ -118,6 +124,7 @@ func (api *NodeAPIClient) GetBalance(address string) (int, error) {
 	return result["balance"], nil
 }
 
+// Sends a transaction to the NodeAPI to be added to the blockchain.
 func (api *NodeAPIClient) SendTransaction(sender, recipient string, amount, fee int) error {
 	tx := map[string]interface{}{
 		"sender":    sender,
@@ -144,6 +151,7 @@ func (api *NodeAPIClient) SendTransaction(sender, recipient string, amount, fee 
 	return nil
 }
 
+// Retrieves the entire blockchain from the NodeAPI.
 func (api *NodeAPIClient) GetBlockchain() ([]*Block, error) {
 	resp, err := http.Get(fmt.Sprintf("%s/blockchain", api.BaseURL))
 	if err != nil {
@@ -159,6 +167,7 @@ func (api *NodeAPIClient) GetBlockchain() ([]*Block, error) {
 	return blocks, nil
 }
 
+// Retrieves a specific transaction by its ID from the NodeAPI.
 func (api *NodeAPIClient) GetTransaction(txID string) (*Transaction, error) {
 	resp, err := http.Get(fmt.Sprintf("%s/transaction?id=%s", api.BaseURL, txID))
 	if err != nil {

@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// Microtransaction represents a small transaction
+// Represents a small transaction, often used in systems where very small amounts are exchanged.
 type Microtransaction struct {
 	ID         string
 	Sender     string
@@ -21,7 +21,7 @@ type Microtransaction struct {
 	BatchID    string
 }
 
-// MicrotransactionBatch represents a batch of microtransactions
+// Represents a batch of microtransactions that are processed together.
 type MicrotransactionBatch struct {
 	ID               string
 	Transactions     []*Microtransaction
@@ -34,12 +34,14 @@ type MicrotransactionBatch struct {
 	ProcessingStatus string
 }
 
+// Pool that holds microtransactions before they are batched and processed.
 type MicrotransactionPool struct {
 	Transactions map[string]*Microtransaction
 	Batches      map[string]*MicrotransactionBatch
 	lock         sync.RWMutex
 }
 
+// Initialises a new MicrotransactionPool.
 func NewMicrotransactionPool() *MicrotransactionPool {
 	return &MicrotransactionPool{
 		Transactions: make(map[string]*Microtransaction),
@@ -47,7 +49,7 @@ func NewMicrotransactionPool() *MicrotransactionPool {
 	}
 }
 
-// AddMicrotransaction adds a microtransaction to the pool
+// Adds a microtransaction to the pool.
 func (mp *MicrotransactionPool) AddMicrotransaction(tx *Microtransaction) error {
 	mp.lock.Lock()
 	defer mp.lock.Unlock()
@@ -63,7 +65,7 @@ func (mp *MicrotransactionPool) AddMicrotransaction(tx *Microtransaction) error 
 	return nil
 }
 
-// CreateBatch creates a new batch of microtransactions for processing
+// Creates a new batch of microtransactions for processing.
 func (mp *MicrotransactionPool) CreateBatch() *MicrotransactionBatch {
 	mp.lock.Lock()
 	defer mp.lock.Unlock()
@@ -93,7 +95,7 @@ func (mp *MicrotransactionPool) CreateBatch() *MicrotransactionBatch {
 	return batch
 }
 
-// ProcessBatch processes a batch of microtransactions
+// Processes a batch of microtransactions.
 func (mp *MicrotransactionPool) ProcessBatch(batchID, nodeAddress string) error {
 	mp.lock.Lock()
 	defer mp.lock.Unlock()
@@ -115,7 +117,7 @@ func (mp *MicrotransactionPool) ProcessBatch(batchID, nodeAddress string) error 
 	return nil
 }
 
-// DistributeTippingReward distributes the rewards from a batch to the recipient
+// Distributes the rewards from a batch to the recipient accounts.
 func (mp *MicrotransactionPool) DistributeTippingReward(batch *MicrotransactionBatch, accounts map[string]*Account) {
 	mp.lock.Lock()
 	defer mp.lock.Unlock()
@@ -132,7 +134,7 @@ func (mp *MicrotransactionPool) DistributeTippingReward(batch *MicrotransactionB
 	}
 }
 
-// SignMicrotransaction signs the microtransaction with the sender's private key
+// Signs the microtransaction with the sender's private key.
 func (tx *Microtransaction) Sign(privKey *ecdsa.PrivateKey) error {
 	hash := tx.Hash()
 	r, s, err := ecdsa.Sign(nil, privKey, []byte(hash))
@@ -143,7 +145,7 @@ func (tx *Microtransaction) Sign(privKey *ecdsa.PrivateKey) error {
 	return nil
 }
 
-// VerifyMicrotransaction verifies the transaction's signature
+// Verifies the transaction's signature using the sender's public key.
 func (tx *Microtransaction) Verify(pubKey *ecdsa.PublicKey) bool {
 	if tx.Signature == nil {
 		return false
@@ -152,7 +154,7 @@ func (tx *Microtransaction) Verify(pubKey *ecdsa.PublicKey) bool {
 	return ecdsa.Verify(pubKey, []byte(hash), tx.Signature.R, tx.Signature.S)
 }
 
-// Hash generates a hash of the transaction
+// Generates a unique hash of the transaction for identification.
 func (tx *Microtransaction) Hash() string {
 	record := tx.Sender + tx.Recipient + fmt.Sprintf("%d", tx.Amount) + fmt.Sprintf("%d", tx.Fee) + fmt.Sprintf("%d", tx.Timestamp)
 	h := sha256.New()
@@ -160,12 +162,12 @@ func (tx *Microtransaction) Hash() string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-// generateTransactionID generates a unique ID for a transaction
+// Generates a unique ID for a transaction.
 func generateTransactionID() string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("%d", time.Now().UnixNano()))))
 }
 
-// generateBatchID generates a unique ID for a batch
+// Generates a unique ID for a batch of microtransactions.
 func generateBatchID() string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("batch-%d", time.Now().UnixNano()))))
 }

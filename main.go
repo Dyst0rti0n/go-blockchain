@@ -9,9 +9,11 @@ import (
 	"strings"
 )
 
+// Global variables for private and public keys used in the node.
 var privateKey *ecdsa.PrivateKey
 var publicKey *ecdsa.PublicKey
 
+// The init function runs before the main function to initialize the key pair.
 func init() {
 	privKey, pubKey, err := GenerateKeyPair()
 	if err != nil {
@@ -22,12 +24,14 @@ func init() {
 }
 
 func main() {
+	// Command-line flags to configure the node
 	nodeAddress := flag.String("node", "localhost:8080", "Node address")
 	knownPeers := flag.String("peers", "", "Comma-separated list of known peers")
 	apiPort := flag.String("api", ":8081", "API server port")
 	mode := flag.String("mode", "full", "Node mode (full, light, api)")
 	flag.Parse()
 
+	// Initialise the bc, mempool, and gamification system
 	blockchain := NewBlockchain()
 	blockchain.UTXOSet = NewUTXOSet()
 	blockchain.Accounts = make(map[string]*Account)
@@ -35,10 +39,12 @@ func main() {
 	database := NewInMemoryDatabase()
 	gamification := NewGamification(database)
 
+	// Create and configure the node with the initialised bc and keys
 	node := NewNode(*nodeAddress, blockchain, privateKey)
 
 	initializeBlockchainWithGenesis(blockchain)
 
+	// Start the API server if the mode is set to "api"
 	if *mode == "api" {
 		api := NewNodeAPI(node)
 		go func() {
@@ -46,14 +52,16 @@ func main() {
 		}()
 	}
 
+	// Run the wallet CLI to interact with the bc
 	cli := NewWalletCLI(NewNodeAPIClient(fmt.Sprintf("http://localhost%s", *apiPort)))
 	cli.Run()
 
-	// Discover and connect to known peers
+	// Discover and connect to known peers if provided
 	if *knownPeers != "" {
 		node.DiscoverPeers(parsePeers(*knownPeers))
 	}
 
+	// Start the node or API server based on the mode
 	switch *mode {
 	case "full":
 		go func() {
@@ -66,17 +74,18 @@ func main() {
 		}()
 	case "light":
 		fmt.Println("Light mode currently under development.")
-		// Implement light node functionality
+		// Light node functionality
 	default:
 		fmt.Println("Invalid mode specified.")
 		os.Exit(1)
 	}
 
-	cliLoop(blockchain, node, gamification)
+	// Enter the CLI loop for interactive commands
+	cliLoop(blockchain, gamification)
 }
 
-
-func cliLoop(bc *Blockchain, node *Node, gamification *Gamification) {
+// cliLoop provides a simple command-line interface for interacting with the blockchain.
+func cliLoop(bc *Blockchain, gamification *Gamification) {
 	for {
 		fmt.Println("1. Create Transaction")
 		fmt.Println("2. Mine Block")
@@ -117,6 +126,7 @@ func cliLoop(bc *Blockchain, node *Node, gamification *Gamification) {
 	}
 }
 
+// Allows switching between different consensus algorithms.
 func handleSwitchConsensus(bc *Blockchain) {
 	fmt.Println("Available consensus algorithms: PoW, PoS")
 	fmt.Print("Enter the new consensus algorithm: ")
@@ -127,6 +137,7 @@ func handleSwitchConsensus(bc *Blockchain) {
 	fmt.Printf("Switched to %s consensus algorithm.\n", algo)
 }
 
+// Creates and signs a new transaction.
 func handleCreateTransaction(tp *Mempool, bc *Blockchain) {
 	var sender, recipient string
 	var amount, fee int
@@ -173,10 +184,11 @@ func handleCreateTransaction(tp *Mempool, bc *Blockchain) {
 	fmt.Println("Transaction created and added to the mempool.")
 }
 
+// Mines a new block with transactions from the mempool.
 func handleMineBlock(bc *Blockchain, tp *Mempool, gamification *Gamification, utxoSet *UTXOSet) {
 	minerAddress := "miner-address" // Replace with the actual miner address
 
-	// Initialize miner's address in UTXO set if not already present
+	// Initialise miner's address in UTXO set if not already present
 	if !utxoSet.HasUTXO(minerAddress) {
 		utxoSet.AddUTXO(UTXO{
 			Owner:  minerAddress,
@@ -208,7 +220,7 @@ func handleMineBlock(bc *Blockchain, tp *Mempool, gamification *Gamification, ut
 		return
 	}
 
-	tp.Clear() // Clear the mempool using the correct method
+	tp.Clear() // Clear the mempool after mining
 
 	// Reward the miner with points for successful block mining
 	gamification.RewardUser(minerAddress, 100, "mining")
@@ -221,6 +233,7 @@ func handleMineBlock(bc *Blockchain, tp *Mempool, gamification *Gamification, ut
 	fmt.Println("Block mined successfully!")
 }
 
+// Deploys a new smart contract on the blockchain.
 func handleDeploySmartContract(bc *Blockchain) {
 	var code string
 	fmt.Print("Enter smart contract code: ")
@@ -235,6 +248,7 @@ func handleDeploySmartContract(bc *Blockchain) {
 	fmt.Printf("Smart contract deployed with ID: %s\n", contractID)
 }
 
+// Executes a method on a deployed smart contract.
 func handleExecuteSmartContract(bc *Blockchain) {
 	var contractID, method string
 	fmt.Print("Enter smart contract ID: ")
@@ -254,6 +268,7 @@ func handleExecuteSmartContract(bc *Blockchain) {
 	fmt.Printf("Smart contract executed. Result: %v\n", result)
 }
 
+// Registers a new Decentralized Identifier (DID) on the blockchain.
 func handleRegisterDID(bc *Blockchain) {
 	var publicKey string
 	fmt.Print("Enter public key: ")
@@ -271,6 +286,7 @@ func handleRegisterDID(bc *Blockchain) {
 	fmt.Printf("DID registered with ID: %s\n", didID)
 }
 
+// Authenticates a DID using a provided signature and message.
 func handleAuthenticateDID(bc *Blockchain) {
 	var didID, signature, message string
 	fmt.Print("Enter DID ID: ")
@@ -293,6 +309,7 @@ func handleAuthenticateDID(bc *Blockchain) {
 	}
 }
 
+// Prints the entire blockchain to the console.
 func handlePrintBlockchain(bc *Blockchain) {
 	for _, block := range bc.Blocks {
 		fmt.Printf("Index: %d\n", block.Index)
@@ -306,10 +323,12 @@ func handlePrintBlockchain(bc *Blockchain) {
 	}
 }
 
+// Parses a comma-separated list of peers into a slice of strings.
 func parsePeers(peers string) []string {
 	return strings.Split(peers, ",")
 }
 
+// Creates a genesis block and initialises the UTXO set with some initial transactions.
 func initializeBlockchainWithGenesis(blockchain *Blockchain) {
 	// Assign some initial UTXOs to users for testing
 	genesisTransaction := &Transaction{

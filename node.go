@@ -14,36 +14,36 @@ import (
 )
 
 const (
-	RateLimitWindow      = 10 * time.Second
-	MaxRequestsPerWindow = 100
-	MaxConnectionRetries = 3
-	RetryDelay           = 2 * time.Second
+	RateLimitWindow      = 10 * time.Second  // Time window for rate limiting peer requests.
+	MaxRequestsPerWindow = 100               // Maximum requests allowed within the rate limit window.
+	MaxConnectionRetries = 3                 // Maximum retries for peer connections.
+	RetryDelay           = 2 * time.Second   // Delay between connection retries.
 )
 
 type MessageType int
 
 const (
-	MessageTypeNewBlock MessageType = iota
-	MessageTypeTransaction
-	MessageTypeRequestBlockchain
-	MessageTypeResponseBlockchain
-	MessageTypeNewPeer
+	MessageTypeNewBlock MessageType = iota     // New block message type.
+	MessageTypeTransaction                     // Transaction message type.
+	MessageTypeRequestBlockchain               // Request for the entire blockchain.
+	MessageTypeResponseBlockchain              // Response containing the entire blockchain.
+	MessageTypeNewPeer                         // Message indicating a new peer connection.
 )
 
 type Message struct {
-	Type    MessageType
-	Payload []byte
+	Type    MessageType   // Type of the message.
+	Payload []byte        // Content of the message.
 }
 
 type Node struct {
-	Address          string
-	Blockchain       *Blockchain
-	Peers            map[string]bool
-	lock             sync.RWMutex
-	requestCounts    map[string]int
-	lastRequestTimes map[string]time.Time
-	messageQueue     chan Message
-	PrivateKey       *ecdsa.PrivateKey
+	Address          string            // The node's address.
+	Blockchain       *Blockchain       // The blockchain instance associated with the node.
+	Peers            map[string]bool   // A map of known peer addresses.
+	lock             sync.RWMutex      // A read-write lock for thread-safe operations.
+	requestCounts    map[string]int    // Counts the number of requests per peer.
+	lastRequestTimes map[string]time.Time // Tracks the last request time per peer.
+	messageQueue     chan Message      // A queue for processing incoming messages.
+	PrivateKey       *ecdsa.PrivateKey // The node's private key for signing transactions.
 }
 
 func NewNode(address string, blockchain *Blockchain, privateKey *ecdsa.PrivateKey) *Node {
@@ -54,11 +54,11 @@ func NewNode(address string, blockchain *Blockchain, privateKey *ecdsa.PrivateKe
 		requestCounts:    make(map[string]int),
 		lastRequestTimes: make(map[string]time.Time),
 		messageQueue:     make(chan Message, 100),
-		PrivateKey: 	  privateKey,
+		PrivateKey:       privateKey,
 	}
 }
 
-// Load TLS configuration.
+// Load the TLS configuration for secure connections, including server and CA certificates.
 func loadTLSConfig() (*tls.Config, error) {
 	cert, err := tls.LoadX509KeyPair("server.crt", "server.key")
 	if err != nil {
@@ -78,7 +78,7 @@ func loadTLSConfig() (*tls.Config, error) {
 	}, nil
 }
 
-// Start the node.
+// Start the node's main operations, including listening for connections and processing messages.
 func (n *Node) Start() error {
 	tlsConfig, err := loadTLSConfig()
 	if err != nil {
@@ -105,7 +105,7 @@ func (n *Node) Start() error {
 	}
 }
 
-// Handle incoming connections.
+// Handle incoming connections from peers, including rate limiting and message decoding.
 func (n *Node) handleConnection(conn net.Conn) {
 	defer conn.Close()
 
@@ -131,7 +131,7 @@ func (n *Node) handleConnection(conn net.Conn) {
 	}
 }
 
-// Rate limiting.
+// Implement rate limiting to prevent peers from overwhelming the node with requests.
 func (n *Node) rateLimit(peerAddr string) bool {
 	now := time.Now()
 	n.lock.Lock()
@@ -149,7 +149,7 @@ func (n *Node) rateLimit(peerAddr string) bool {
 	return n.requestCounts[peerAddr] <= MaxRequestsPerWindow
 }
 
-// Process messages from the queue.
+// Continuously process messages from the message queue, dispatching them to the appropriate handlers.
 func (n *Node) processMessageQueue() {
 	for msg := range n.messageQueue {
 		switch msg.Type {
@@ -165,7 +165,7 @@ func (n *Node) processMessageQueue() {
 	}
 }
 
-// Handle new block reception.
+// Handle the reception of a new block, validate it, and propagate it to peers.
 func (n *Node) handleNewBlock(payload []byte) {
 	var block Block
 	err := json.Unmarshal(payload, &block)
@@ -181,7 +181,7 @@ func (n *Node) handleNewBlock(payload []byte) {
 	}
 }
 
-// Handle transaction reception.
+// Handle the reception of a transaction, validate it, and propagate it to peers.
 func (n *Node) handleTransaction(payload []byte) {
 	var tx Transaction
 	err := json.Unmarshal(payload, &tx)
@@ -196,7 +196,7 @@ func (n *Node) handleTransaction(payload []byte) {
 	n.broadcastToPeers(MessageTypeTransaction, payload)
 }
 
-// Handle blockchain request.
+// Respond to requests for the entire blockchain by sending the blockchain data to the requesting peer.
 func (n *Node) handleRequestBlockchain(conn net.Conn) {
 	n.Blockchain.lock.RLock()
 	defer n.Blockchain.lock.RUnlock()
@@ -213,7 +213,7 @@ func (n *Node) handleRequestBlockchain(conn net.Conn) {
 	}
 }
 
-// Handle blockchain response.
+// Handle the reception of a blockchain from a peer, and update the node's blockchain if the received one is valid and longer.
 func (n *Node) handleResponseBlockchain(payload []byte) {
 	var receivedBlockchain Blockchain
 	err := json.Unmarshal(payload, &receivedBlockchain)
@@ -228,7 +228,7 @@ func (n *Node) handleResponseBlockchain(payload []byte) {
 	}
 }
 
-// Handle new peer connections.
+// Handle the addition of a new peer to the node's list of known peers and attempt to establish a connection.
 func (n *Node) handleNewPeer(payload []byte) {
 	var peerAddress string
 	err := json.Unmarshal(payload, &peerAddress)
@@ -244,7 +244,7 @@ func (n *Node) handleNewPeer(payload []byte) {
 	}
 }
 
-// Connect to a peer.
+// Attempt to establish a secure connection to a peer and notify them of the new connection.
 func (n *Node) connectToPeer(address string) {
 	for i := 0; i < MaxConnectionRetries; i++ {
 		tlsConfig, err := loadTLSConfig()
@@ -277,7 +277,7 @@ func (n *Node) connectToPeer(address string) {
 	}
 }
 
-// Broadcast messages to peers.
+// Broadcast a message to all known peers in the network.
 func (n *Node) broadcastToPeers(msgType MessageType, payload []byte) {
 	n.lock.RLock()
 	defer n.lock.RUnlock()
@@ -313,7 +313,7 @@ func (n *Node) broadcastToPeers(msgType MessageType, payload []byte) {
 	}
 }
 
-// Peer discovery.
+// Attempt to connect to a list of known peers, establishing connections with those that are
 func (n *Node) DiscoverPeers(knownPeers []string) {
 	for _, peer := range knownPeers {
 		if peer != n.Address {

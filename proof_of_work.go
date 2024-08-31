@@ -1,4 +1,3 @@
-// proof_of_work.go
 package main
 
 import (
@@ -13,9 +12,10 @@ import (
 	"time"
 )
 
+// ProofOfWork represents the proof of work algorithm used to secure the blockchain.
 type ProofOfWork struct {
-	Block      *Block
-	Difficulty int
+	Block      *Block  // The block that is being mined.
+	Difficulty int     // The difficulty level for mining, represented by the number of leading zeros required in the hash.
 }
 
 func NewProofOfWork(b *Block) *ProofOfWork {
@@ -26,6 +26,7 @@ func NewProofOfWork(b *Block) *ProofOfWork {
 }
 
 // Run performs the proof of work using concurrency and includes a timeout mechanism.
+// It tries to find a nonce that results in a hash with the required number of leading zeros.
 func (pow *ProofOfWork) Run() (int, string, error) {
     var wg sync.WaitGroup
     var mu sync.Mutex
@@ -33,10 +34,13 @@ func (pow *ProofOfWork) Run() (int, string, error) {
     var nonce int
     var hash string
 
-    numWorkers := runtime.NumCPU() // Number of goroutines for parallel computation based on CPU cores
+    numWorkers := runtime.NumCPU() // Determine the number of goroutines based on available CPU cores.
     workChan := make(chan int, numWorkers)
 
-    timeout := time.After(5 * time.Minute) // Set a timeout for the mining process
+    timeout := time.After(5 * time.Minute) // Set a timeout for the mining process.
+
+    randGen := rand.New(rand.NewSource(time.Now().UnixNano())) // Updated to use new source for better predictability.
+    startNonce := randGen.Intn(1_000_000_000)
 
     for i := 0; i < numWorkers; i++ {
         wg.Add(1)
@@ -50,7 +54,7 @@ func (pow *ProofOfWork) Run() (int, string, error) {
                         found = true
                         nonce = n
                         hash = h
-                        close(workChan)
+                        close(workChan) // Stop other goroutines once the solution is found.
                     }
                     mu.Unlock()
                     break
@@ -59,13 +63,11 @@ func (pow *ProofOfWork) Run() (int, string, error) {
         }()
     }
 
-    rand.Seed(time.Now().UnixNano())
-    startNonce := rand.Intn(1_000_000_000)
     go func() {
         for i := startNonce; !found; i++ {
             select {
             case <-timeout:
-                close(workChan)
+                close(workChan) // Stop all work if the timeout is reached.
                 return
             default:
                 workChan <- i
@@ -81,6 +83,7 @@ func (pow *ProofOfWork) Run() (int, string, error) {
     return nonce, hash, nil
 }
 
+// calculateHash generates a SHA-256 hash of the block's data combined with the given nonce.
 func (pow *ProofOfWork) calculateHash(nonce int) string {
 	record := strconv.Itoa(pow.Block.Index) +
 		strconv.FormatInt(pow.Block.Timestamp, 10) +
@@ -92,9 +95,8 @@ func (pow *ProofOfWork) calculateHash(nonce int) string {
 	return hex.EncodeToString(hash[:])
 }
 
-// Validate checks if the provided nonce results in a valid hash.
+// Validate checks if the provided nonce results in a valid hash that meets the difficulty criteria.
 func (pow *ProofOfWork) Validate() bool {
 	hash := pow.calculateHash(pow.Block.Nonce)
 	return strings.HasPrefix(hash, strings.Repeat("0", pow.Difficulty))
 }
-

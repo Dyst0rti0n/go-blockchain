@@ -7,19 +7,20 @@ import (
 	"time"
 )
 
+// Mempool is a pool that holds transactions before they are confirmed and added to a block.
 type Mempool struct {
 	transactions map[string]*Transaction // Using a map for quick lookups and uniqueness
-	lock         sync.RWMutex
+	lock         sync.RWMutex            // Read-write lock for thread-safe access
 }
 
-// NewMempool initializes a new Mempool
+// Initialises a new Mempool
 func NewMempool() *Mempool {
 	return &Mempool{
 		transactions: make(map[string]*Transaction),
 	}
 }
 
-// Modify the AddTransaction function to correctly call the sortTransactionsByFee method
+// Adds a new transaction to the mempool after validating it.
 func (m *Mempool) AddTransaction(tx *Transaction, accounts map[string]*Account, utxoSet *UTXOSet) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -43,7 +44,7 @@ func (m *Mempool) AddTransaction(tx *Transaction, accounts map[string]*Account, 
 	return nil
 }
 
-// RemoveTransaction removes a transaction from the mempool.
+// Removes a transaction from the mempool.
 func (m *Mempool) RemoveTransaction(tx *Transaction) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -52,7 +53,7 @@ func (m *Mempool) RemoveTransaction(tx *Transaction) {
 	delete(m.transactions, txID)
 }
 
-// GetTransaction returns a specific transaction by its ID
+// Returns a specific transaction by its ID
 func (m *Mempool) GetTransaction(txID string) *Transaction {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
@@ -60,7 +61,7 @@ func (m *Mempool) GetTransaction(txID string) *Transaction {
 	return m.transactions[txID]
 }
 
-// GetTransactions returns a list of all transactions in the mempool, sorted by fee.
+// Returns a list of all transactions in the mempool, sorted by fee.
 func (m *Mempool) GetTransactions() []*Transaction {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
@@ -75,28 +76,28 @@ func (m *Mempool) GetTransactions() []*Transaction {
 	return transactions
 }
 
-// IsEmpty checks if the mempool is empty.
+// Checks if the mempool is empty.
 func (m *Mempool) IsEmpty() bool {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 	return len(m.transactions) == 0
 }
 
-// Clear clears the mempool.
+// Clear clears the mempool, removing all transactions.
 func (m *Mempool) Clear() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.transactions = make(map[string]*Transaction)
 }
 
-// sortTransactionsByFee sorts the transactions by fee in descending order.
+// Sorts the transactions by fee in descending order.
 func (m *Mempool) sortTransactionsByFee(transactions []*Transaction) {
 	sort.SliceStable(transactions, func(i, j int) bool {
 		return transactions[i].Fee > transactions[j].Fee
 	})
 }
 
-// PurgeOldTransactions removes transactions that have been in the mempool for too long.
+// Removes transactions that have been in the mempool for too long.
 func (m *Mempool) PurgeOldTransactions(maxAge time.Duration) {
 	m.lock.Lock()
 	defer m.lock.Unlock()

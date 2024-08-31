@@ -9,14 +9,16 @@ import (
 	"strings"
 )
 
+// WalletCLI provides a command-line interface for interacting with the blockchain.
 type WalletCLI struct {
-	API *NodeAPIClient
+	API *NodeAPIClient // API client to communicate with the blockchain node.
 }
 
 func NewWalletCLI(api *NodeAPIClient) *WalletCLI {
 	return &WalletCLI{API: api}
 }
 
+// Run starts the CLI and presents the user with options to interact with the blockchain.
 func (cli *WalletCLI) Run() {
 	for {
 		fmt.Println("1. Check Balance")
@@ -46,6 +48,7 @@ func (cli *WalletCLI) Run() {
 	}
 }
 
+// handleCheckBalance prompts the user for an address and displays its balance.
 func (cli *WalletCLI) handleCheckBalance() {
 	fmt.Print("Enter address: ")
 	var address string
@@ -60,6 +63,7 @@ func (cli *WalletCLI) handleCheckBalance() {
 	fmt.Printf("Balance of %s: %d\n", address, balance)
 }
 
+// handleSendTransaction prompts the user for transaction details and sends it to the blockchain.
 func (cli *WalletCLI) handleSendTransaction() {
 	reader := bufio.NewReader(os.Stdin)
 
@@ -88,6 +92,7 @@ func (cli *WalletCLI) handleSendTransaction() {
 	fmt.Println("Transaction sent successfully!")
 }
 
+// handleViewBlockchain retrieves and displays the blockchain.
 func (cli *WalletCLI) handleViewBlockchain() {
 	blocks, err := cli.API.GetBlockchain()
 	if err != nil {
@@ -107,6 +112,7 @@ func (cli *WalletCLI) handleViewBlockchain() {
 	}
 }
 
+// handleViewTransaction prompts the user for a transaction ID and displays the transaction details.
 func (cli *WalletCLI) handleViewTransaction() {
 	fmt.Print("Enter transaction ID: ")
 	var txID string
