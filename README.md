@@ -53,9 +53,9 @@ Go-Blockchain is an advanced blockchain platform built using Go. It is designed 
    go build -o go-blockchain
    ```
 
-3. **Run Tests:**
+3. **Or Run:**
    ```bash
-   go test ./...
+   go run .
    ```
 
 ### Running a Node
